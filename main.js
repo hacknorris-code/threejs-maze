@@ -5,31 +5,20 @@ import { EffectComposer } from 'https://cdn.skypack.dev/three@0.149.0/examples/j
 import { RenderPass } from 'https://cdn.skypack.dev/three@0.149.0/examples/jsm/postprocessing/RenderPass';
 import { ShaderPass } from 'https://cdn.skypack.dev/three@0.149.0/examples/jsm/postprocessing/ShaderPass';
 import { RGBShiftShader } from './shader/RGBShiftShader.js';
-import { FilmShader } from './shader/FilmShader.js';
 import { StaticShader } from './shader/StaticShader.js';
-import { BadTVShader } from './shader/BadTVShader.js';
 import Stats from 'https://cdn.skypack.dev/stats.js';
 import { VignetteShader } from './shader/VignetteShader.js';
-import { UnrealBloomPass } from './shader/UnrealBloomPass.js';
 
 import * as THREE from 'https://unpkg.com/three@0.149.0/build/three.module.js';
 
 var mazeWidth = 10;
 var mazeHeight = mazeWidth;
-
+var howMuch = 4;
 var notStarted = true;
-
-var flashlightEnabled = false;
-var flashlight;
 
 var fpsCapped = true;
 
 var paused = true;
-
-var dynamicLightsPopup = false;
-var editModePopup = false;
-
-var editMode = false;
 
 var secretEnabled = false;
 
@@ -68,14 +57,6 @@ const composer = new EffectComposer(renderer, renderTarget1);
 // Create render passes for each composer
 const renderPass1 = new RenderPass(scene, camera);
 
-const filmPass = new ShaderPass(FilmShader);
-filmPass.renderToScreen = true;
-
-filmPass.uniforms.grayscale.value = 0;
-filmPass.uniforms.nIntensity.value = 0.1;
-filmPass.uniforms.sIntensity.value = 0.8;
-filmPass.uniforms.sCount.value = 375;
-
 const staticPass = new ShaderPass(StaticShader);
 
 staticPass.uniforms.amount.value = 0.04;
@@ -87,39 +68,21 @@ RGBShiftShaderPass.renderToScreen = true;
 RGBShiftShaderPass.uniforms.amount.value = 0.001;
 RGBShiftShaderPass.uniforms.angle.value = 0.0;
 
-const BadTVShaderPass = new ShaderPass(BadTVShader);
-BadTVShaderPass.renderToScreen = true;
-
-BadTVShaderPass.uniforms.distortion.value = 0.15;
-BadTVShaderPass.uniforms.distortion2.value = 0.3;
-BadTVShaderPass.uniforms.speed.value = 0.005;
-BadTVShaderPass.uniforms.rollSpeed.value = 0;
-
 const vignettePass = new ShaderPass(VignetteShader);
 vignettePass.renderToScreen = true;
 
 vignettePass.uniforms.offset.value = 0.81;
 vignettePass.uniforms.darkness.value = 1.0;
 
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-bloomPass.renderToScreen = false;
-
-bloomPass.threshold = 1;
-bloomPass.strength = 0;
-bloomPass.radius = 0.9;
-
 // Add the render passes to their respective composers
 composer.addPass(renderPass1);
 composer.addPass(staticPass);
 composer.addPass(RGBShiftShaderPass);
-composer.addPass(filmPass);
-composer.addPass(BadTVShaderPass);
+
 composer.addPass(vignettePass);
-composer.addPass(bloomPass);
 
 let acceleration = 0.002;
 let tolerance = mazeWidth;
-var lightsEnabled = true;
 
 var shadersToggled = true;
 
@@ -130,16 +93,12 @@ const gameplaySettings = gui.addFolder("Gameplay Settings");
 const shaderSettings = gui.addFolder("Shader Settings");
 const staticSettings = shaderSettings.addFolder("Static Settings");
 const rgbSettings = shaderSettings.addFolder("RGB Shift Settings");
-const filmSettings = shaderSettings.addFolder("Scanline Settings");
-const badtvSettings = shaderSettings.addFolder("Bad TV Settings");
 const vignetteSettings = shaderSettings.addFolder("Vignette Settings");
-const bloomSettings = shaderSettings.addFolder("Bloom Settings");
 const guicontrols = {
     enabled: true,
     pixelratio: 50,
     movementspeed: 1,
     generationdistance: mazeWidth,
-    dynamiclights: false,
     fpscapped: true
 };
 const staticControls = {
@@ -152,30 +111,10 @@ const rgbControls = {
     amount: 0.001,
     angle: 0.0
 };
-const filmControls = {
-    enabled: true,
-    grayscale: false,
-    nIntensity: 0.1,
-    sIntensity: 0.8,
-    sCount: 375
-};
-const badtvControls = {
-    enabled: true,
-    distortion: 0.15,
-    distortion2: 0.3,
-    speed: 0.005,
-    rollSpeed: 0
-};
 const vignetteControls = {
     enabled: true,
     offset: 0.81,
     darkness: 1.0
-};
-const bloomControls = {
-    enabled: false,
-    threshold: 1,
-    strength: 0,
-    radius: 0.9
 };
 
 // add control for rotationSpeed
@@ -192,20 +131,6 @@ gameplaySettings.add(guicontrols, "movementspeed", 0.2, 3, 0.1).onChange((value)
 graphicSettings.add(guicontrols, "generationdistance", 1, mazeWidth, 1).onChange((value) => {
     tolerance = value;
 }).name("Generation Distance").listen();
-
-// add control for dynamicLights
-graphicSettings.add(guicontrols, "dynamiclights").onChange((value) => {
-    lightsEnabled = value;
-    if (value) {
-        createLightSources(offsetX, offsetZ);
-        ceilingMaterial.color.setHex(0xffffff);
-        ambientLight.intensity = 0.1;
-    } else {
-        deleteLights();
-        ceilingMaterial.color.setHex(0x777777);
-        ambientLight.intensity = 0.7;
-    }
-}).name("Dynamic Lights").listen();
 
 // add control for fpsCapped
 graphicSettings.add(guicontrols, "fpscapped").onChange((value) => {
@@ -245,58 +170,6 @@ rgbSettings.add(rgbControls, "angle", 0, 1, 0.001).onChange((value) => {
     RGBShiftShaderPass.uniforms.angle.value = value;
 }).name("Angle").listen();
 
-// add control for film
-filmSettings.add(filmControls, "enabled").onChange((value) => {
-    filmPass.enabled = value;
-    if (value) {
-        filmPass.renderToScreen = true;
-    } else {
-        filmPass.renderToScreen = false;
-    }
-}).name("Enabled").listen();
-
-filmSettings.add(filmControls, "grayscale").onChange((value) => {
-    filmPass.uniforms.grayscale.value = value;
-}).name("Grayscale").listen();
-
-filmSettings.add(filmControls, "nIntensity", 0, 1, 0.001).onChange((value) => {
-    filmPass.uniforms.nIntensity.value = value;
-}).name("Noise Intensity").listen();
-
-filmSettings.add(filmControls, "sIntensity", 0, 1, 0.001).onChange((value) => {
-    filmPass.uniforms.sIntensity.value = value;
-}).name("Scanline Intensity").listen();
-
-filmSettings.add(filmControls, "sCount", 0, 1500, 1).onChange((value) => {
-    filmPass.uniforms.sCount.value = value;
-}).name("Scanline Count").listen();
-
-// add control for bad tv
-badtvSettings.add(badtvControls, "enabled").onChange((value) => {
-    BadTVShaderPass.enabled = value;
-    if (value) {
-        BadTVShaderPass.renderToScreen = true;
-    } else {
-        BadTVShaderPass.renderToScreen = false;
-    }
-}).name("Enabled").listen();
-
-badtvSettings.add(badtvControls, "distortion", 0, 1, 0.001).onChange((value) => {
-    BadTVShaderPass.uniforms.distortion.value = value;
-}).name("Distortion").listen();
-
-badtvSettings.add(badtvControls, "distortion2", 0, 1, 0.001).onChange((value) => {
-    BadTVShaderPass.uniforms.distortion2.value = value;
-}).name("Distortion 2").listen();
-
-badtvSettings.add(badtvControls, "speed", 0, 1, 0.001).onChange((value) => {
-    BadTVShaderPass.uniforms.speed.value = value;
-}).name("Speed").listen();
-
-badtvSettings.add(badtvControls, "rollSpeed", 0, 1, 0.001).onChange((value) => {
-    BadTVShaderPass.uniforms.rollSpeed.value = value;
-}).name("Roll Speed").listen();
-
 // add control for vignette
 vignetteSettings.add(vignetteControls, "enabled").onChange((value) => {
     vignettePass.enabled = value;
@@ -315,28 +188,6 @@ vignetteSettings.add(vignetteControls, "darkness", 0, 1, 0.001).onChange((value)
     vignettePass.uniforms.darkness.value = value;
 }).name("Darkness").listen();
 
-// add control for bloom
-bloomSettings.add(bloomControls, "enabled").onChange((value) => {
-    bloomPass.enabled = value;
-    if (value) {
-        bloomPass.renderToScreen = true;
-    } else {
-        bloomPass.renderToScreen = false;
-    }
-}).name("Enabled").listen();
-
-bloomSettings.add(bloomControls, "threshold", 0, 1, 0.001).onChange((value) => {
-    bloomPass.threshold = value;
-}).name("Threshold").listen();
-
-bloomSettings.add(bloomControls, "strength", 0, 1, 0.001).onChange((value) => {
-    bloomPass.strength = value;
-}).name("Strength").listen();
-
-bloomSettings.add(bloomControls, "radius", 0, 1, 0.001).onChange((value) => {
-    bloomPass.radius = value;
-}).name("Radius").listen();
-
 // toggle all shaders
 shaderSettings.add({ toggleAll: function () {
     toggleShaders();
@@ -346,16 +197,11 @@ function toggleShaders(){
     if (shadersToggled) {
         staticPass.enabled = false;
         RGBShiftShaderPass.enabled = false;
-        filmPass.enabled = false;
-        BadTVShaderPass.enabled = false;
         vignettePass.enabled = false;
-        bloomPass.enabled = false;
         shadersToggled = false;
     } else {
         staticPass.enabled = true;
         RGBShiftShaderPass.enabled = true;
-        filmPass.enabled = true;
-        BadTVShaderPass.enabled = true;
         vignettePass.enabled = true;
         shadersToggled = true;
     }
@@ -369,29 +215,15 @@ function toggleShaders(){
     } else {
         RGBShiftShaderPass.renderToScreen = false;
     }
-    if (filmPass.enabled) {
-        filmPass.renderToScreen = true;
-    } else {
-        filmPass.renderToScreen = false;
-    }
-    if (BadTVShaderPass.enabled) {
-        BadTVShaderPass.renderToScreen = true;
-    } else {
-        BadTVShaderPass.renderToScreen = false;
-    }
     if (vignettePass.enabled) {
         vignettePass.renderToScreen = true;
     } else {
         vignettePass.renderToScreen = false;
     }
-    bloomPass.renderToScreen = false;
     // also set all the settings
     staticControls.enabled = staticPass.enabled;
     rgbControls.enabled = RGBShiftShaderPass.enabled;
-    filmControls.enabled = filmPass.enabled;
-    badtvControls.enabled = BadTVShaderPass.enabled;
     vignetteControls.enabled = vignettePass.enabled;
-    bloomControls.enabled = bloomPass.enabled;
 }
 
 shaderSettings.close();
@@ -422,25 +254,12 @@ startButton.addEventListener(
         if (notStarted){
             startButton.innerHTML = "Click to Resume"
             setTimeout(function () {
-                popupMessage("Press \"F\" to toggle the flashlight.")
-            }, 3000);
-            setTimeout(function () {
                 popupMessage("Press \"1\" to toggle all shader effects.")
             }, 15000);
-            setTimeout(function () {
-                if (dynamicLightsPopup)
-                    return;
-                popupMessage("Press \"2\" or \"G\" to toggle dynamic lights.")
-            }, 22500);
             setTimeout(function () {
 
                 popupMessage("Press \"3\" to toggle FPS cap.")
             }, 30000);
-            setTimeout(function () {
-                if (editModePopup)
-                    return;
-                popupMessage("Press \"X\" to toggle edit mode.")
-            }, 45000);
             setTimeout(function () {
 
                 popupMessage("Enter the Konami Code for a super top secret suprise!")
@@ -450,7 +269,6 @@ startButton.addEventListener(
             controls.getObject().position.x = 0;
             controls.getObject().position.y = 0.5;
             controls.getObject().position.z = 0;
-            createFlashlight();
             notStarted = false;
         }
         paused = false;
@@ -490,34 +308,8 @@ document.addEventListener(
                 activateKonamiCode();
             }
         }
-        if (e.code === 'KeyF') {
-            if (!paused){
-                if (flashlightEnabled) {
-                    deleteFlashlight();
-                    flashlightEnabled = false;
-                } else {
-                    flashlightEnabled = true;
-                    createFlashlight();
-                }
-            }
-        }
         if (e.code == 'Digit1') {
             toggleShaders();
-        }
-        if (e.code === 'Digit2' || e.code === 'KeyG') {
-            if (lightsEnabled) {
-                lightsEnabled = false;
-                guicontrols.dynamiclights = false;
-                deleteLights();
-                ceilingMaterial.color.setHex(0x777777);
-                ambientLight.intensity = 0.7;
-            } else {
-                lightsEnabled = true;
-                guicontrols.dynamiclights = true;
-                createLightSources(offsetX, offsetZ);
-                ceilingMaterial.color.setHex(0xffffff);
-                ambientLight.intensity = 0.1;
-            }
         }
         if (e.code == 'Digit3') {
             fpsCapped = !fpsCapped;
@@ -532,11 +324,6 @@ document.addEventListener(
                 renderer.setPixelRatio(window.devicePixelRatio * 1);
             }
         }
-        if (e.code == "KeyX") {
-            if (!paused) {
-                toggleEditMode();
-            }
-        }
         if (!key.indexOf(input)) return;
         input = '' + e.keyCode;
         if (e.code === 'Escape') {
@@ -548,24 +335,6 @@ document.addEventListener(
     },
     false
 )
-
-flashlight = new THREE.SpotLight(0xffffff, 0, 0, Math.PI / 6, 0.5, 2.5);
-flashlight.castShadow = true;
-flashlight.shadow.mapSize.width = 1024;
-flashlight.shadow.mapSize.height = 1024;
-flashlight.shadow.camera.near = 0.5;
-flashlight.shadow.camera.far = mazeHeight + 1;
-flashlight.identifier = "flashlight";
-scene.add(flashlight);
-flashlight.intensity = 0;
-
-function createFlashlight(){
-    flashlight.intensity = 0.7;
-}
-
-function deleteFlashlight(){
-    flashlight.intensity = 0;
-}
 
 
 // if lose focus of canvas, unlock pointer lock controls and show #startButton and #menuPanel. listen for blur
@@ -827,96 +596,6 @@ function generateMazeWalls(maze, offsetX, offsetZ) {
 
 const raycaster = new THREE.Raycaster();
 
-function toggleEditMode(){
-    if (!editModePopup)
-        editModePopup = true;
-    editMode = !editMode;
-    if (editMode) {
-        popupMessage("Edit Mode Enabled. <br> Click to remove walls or right click to add walls.")
-        // add event listener for mouse clicks
-        document.addEventListener('click', handleEditModeClick, false);
-    } else {
-        popupMessage("Edit Mode Disabled.")
-        // remove event listener for mouse clicks
-        document.removeEventListener('click', handleEditModeClick, false);
-    }
-
-}
-
-function handleEditModeClick(event) {
-    if (paused)
-        return;
-    if (event.button == 2){
-        const mouse = new THREE.Vector2();
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const intersects = raycaster.intersectObjects(scene.children);
-        if (intersects.length > 0) {
-            if (intersects[0].object.identifier?.includes("wall")) {
-                const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-                wall.position.x = intersects[0].object.position.x + intersects[0].face.normal.x;
-                wall.position.z = intersects[0].object.position.z + intersects[0].face.normal.z;
-                wall.position.y = wallSize / 2;
-                wall.castShadow = true;
-                wall.receiveShadow = true;
-                wall.identifier = `${offsetX},${offsetZ},wall`
-                console.log(wall.identifier)
-                const baseboard = new THREE.Mesh(baseboardGeometry, baseboardMaterial);
-                baseboard.position.x = 0.00;
-                baseboard.position.z = 0.00;
-                baseboard.position.y = -0.5;
-                baseboard.castShadow = true;
-                baseboard.receiveShadow = true;
-                baseboard.identifier = `${offsetX},${offsetZ},baseboard`
-                if (wall.position.x == Math.round(controls.getObject().position.x) && wall.position.z == Math.round(controls.getObject().position.z)) {
-                    return;
-                }
-                wall.add(baseboard);
-                scene.add(wall);
-            } else if  (intersects[0].object.identifier?.includes("floor")) {
-                const wall = new THREE.Mesh(wallGeometry, wallMaterial);
-                wall.position.x = Math.round(intersects[0].point.x);
-                wall.position.z = Math.round(intersects[0].point.z);
-                wall.position.y = wallSize / 2;
-                wall.castShadow = true;
-                wall.receiveShadow = true;
-                wall.identifier = `${offsetX},${offsetZ},wall`
-                const baseboard = new THREE.Mesh(baseboardGeometry, baseboardMaterial);
-                baseboard.position.x = 0.00;
-                baseboard.position.z = 0.00;
-                baseboard.position.y = -0.5;
-                baseboard.castShadow = true;
-                baseboard.receiveShadow = true;
-                if (wall.position.x == Math.round(controls.getObject().position.x) && wall.position.z == Math.round(controls.getObject().position.z)) {
-                    return;
-                }
-                wall.add(baseboard);
-                scene.add(wall);
-            }
-        }
-    } else if (event.button == 0){
-        if (event.target.tagName === 'CANVAS') {
-            const mouse = new THREE.Vector2();
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(scene.children);
-            if (intersects.length > 0) {
-                if (intersects[0].object.identifier?.includes("wall") || intersects[0].object.identifier?.includes("baseboard")) {
-                    // if baseboard, delet wall too
-                    console.log(intersects[0].object.parent.identifier)
-                    if (intersects[0].object.parent.identifier?.includes("wall")) {
-                        scene.remove(intersects[0].object.parent);
-                    } else {
-                        scene.remove(intersects[0].object);
-                    }
-                }
-            } 
-        }
-    }
-}
-
 let shaderTime = 0;
 
 const halfMazeWidth = mazeWidth / 2;
@@ -924,8 +603,6 @@ const halfMazeHeight = mazeHeight / 2;
 
 var lastTime = 0;
 var maxFPS = 100;
-
-var performanceOverride = false;
 
 let clock = new THREE.Clock();
 
@@ -941,8 +618,8 @@ function update() {
         if (keyState.KeyS) velocity.z -= acceleration;
         if (keyState.KeyD) velocity.x += acceleration;
         if (keyState.KeyQ) velocity.y += acceleration;
-        if (keyState.Space && editMode) velocity.y += acceleration;
-        if (keyState.KeyE && editMode) velocity.y -= acceleration;
+        if (keyState.Space) velocity.y += acceleration;
+        if (keyState.KeyE) velocity.y -= acceleration;
         if (keyState.ShiftLeft) velocity.z += acceleration * 1.5;
 
         velocity.multiplyScalar(damping);
@@ -952,26 +629,6 @@ function update() {
         controls.moveForward(velocity.z);
         controls.moveRight(velocity.x);
         controls.moveUp(velocity.y);
-
-        if (flashlightEnabled && flashlight != undefined) { // flashlight follows camera
-            flashlight.position.copy(controls.getObject().position);
-            flashlight.position.y -= 0.12;
-            // use trig to always keep the flashlight directly to the right of the camera
-            
-            flashlight.position.x += Math.cos(camera.rotation.y + Math.PI / 2) * 0.15;
-            flashlight.position.z += Math.sin(camera.rotation.y + Math.PI / 2) * 0.15;
-            
-            var direction = new THREE.Vector3(0, 0, -1);
-            direction.applyQuaternion(camera.quaternion); // apply camera's quaternion to the direction
-    
-            var distance = 5;
-    
-            var targetPosition = new THREE.Vector3();
-            targetPosition.copy(controls.getObject().position).add(direction.multiplyScalar(distance));
-    
-            flashlight.target.position.copy(targetPosition);
-            flashlight.target.updateMatrixWorld();
-        }
 
         checkWallCollisions(oldPosition);
 
@@ -1006,24 +663,11 @@ function update() {
 
         shaderTime += 0.1;
         staticPass.uniforms.time.value = (shaderTime / 10);
-        filmPass.uniforms.time.value = shaderTime;
-        BadTVShaderPass.uniforms.time.value = shaderTime;
 
         composer.render();
 
         lastTime = currentTime;
         stats.end();
-    }
-
-    if (currentTime > 1000 && !performanceOverride) {
-        lightsEnabled = false;
-            guicontrols.dynamiclights = false;
-            deleteLights();
-            ceilingMaterial.color.setHex(0x777777);
-            ambientLight.intensity = 0.7;
-            popupMessage("Dynamic lights have been automatically disabled. \n Press \"2\" or \"G\" to re-enable them.")
-            dynamicLightsPopup = true;
-        performanceOverride = true;
     }
 
     const delta = clock.getDelta();
@@ -1057,15 +701,13 @@ function handleOffsetChange(newOffsetX, newOffsetZ, offsetPairs) {
     if ((newOffsetX != offsetX || newOffsetZ != offsetZ) && !hasVisitedOffset(newOffsetX, newOffsetZ)) {
         offsetX = newOffsetX;
         offsetZ = newOffsetZ;
-        createLightSources(offsetX, offsetZ);
-        deleteLightsExceptOffset(offsetX, offsetZ);
+        //deleteLightsExceptOffset(offsetX, offsetZ);
         visitedOffsets.push([newOffsetX, newOffsetZ]);
         coordinates.innerHTML = `(${offsetX},${offsetZ})`;
     } else if (newOffsetX != offsetX || newOffsetZ != offsetZ) {
         offsetX = newOffsetX;
         offsetZ = newOffsetZ;
-        deleteLightsExceptOffset(offsetX, offsetZ);
-        createLightSources(offsetX, offsetZ);
+        //deleteLightsExceptOffset(offsetX, offsetZ);
         coordinates.innerHTML = `(${offsetX},${offsetZ})`;
     }
 }
@@ -1105,7 +747,7 @@ function checkCollision(position, wall) {
     );
 }
 
-var ambientLight = new THREE.AmbientLight(0xe8e4ca, 0.1);
+var ambientLight = new THREE.AmbientLight(0xe8e4ca, 0.7);
 scene.add(ambientLight);
 
 scene.fog = new THREE.FogExp2(0xe8e4d1, 0.17);
@@ -1177,46 +819,9 @@ function createLights(offsetX, offsetZ) {
     }
 }
 
-function createLightSources(offsetX, offsetZ){
-    if (!lightsEnabled) {
-        return;
-    }
-    // do same as above, but go two block out from the maze, and add a lightsource every 2 blocks
-    for (var i = -tolerance; i < mazeWidth + tolerance; i = i + 2) {
-        for (var j = -tolerance; j < mazeHeight + tolerance; j = j + 2) {
-            const lightSource = new THREE.PointLight(0xf5f4cb, 1.1, 3.1);
-            lightSource.position.x = (i - mazeWidth / 2) + (offsetX * mazeWidth);
-            lightSource.position.y = 0.85;
-            lightSource.position.z = (j - mazeHeight / 2) + (offsetZ * mazeHeight);
-            // add identifier to lightsource so we can delete it later
-            lightSource.identifier = `${offsetX},${offsetZ}`
-            scene.add(lightSource);
-        }
-    }
-}
-
 createLights(0,0);
-createLightSources(0,0);
 
 let mixer;
-
-function deleteLightsExceptOffset(offsetX, offsetZ) {
-    for (var i = scene.children.length - 1; i >= 0; i--) {
-        if (scene.children[i].type === "PointLight") {
-            if (scene.children[i].identifier != `${offsetX},${offsetZ}`) {
-                scene.remove(scene.children[i]);
-            }
-        }
-    }
-}
-
-function deleteLights() {
-    for (var i = scene.children.length - 1; i >= 0; i--) {
-        if (scene.children[i].type === "PointLight") {
-            scene.remove(scene.children[i]);
-        }
-    }
-}
 
 // set position for moving camera 
 controls.getObject().position.x = (mazeWidth / 2) - 0.00001;
@@ -1285,11 +890,5 @@ function showMessage(message) {
     }, 2500);
 }
 
-lightsEnabled = false;
-        guicontrols.dynamiclights = false;
-        deleteLights();
-        ceilingMaterial.color.setHex(0x777777);
-        ambientLight.intensity = 0.7;
-        popupMessage("Dynamic lights have been automatically disabled. \n Press \"2\" or \"G\" to re-enable them.")
-        dynamicLightsPopup = true;
-    performanceOverride = true;
+ceilingMaterial.color.setHex(0x777777);
+
