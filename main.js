@@ -1,5 +1,4 @@
 import GUI from "https://cdn.skypack.dev/lil-gui@0.18.0";
-
 import { PointerLockControls } from "./PointerLockControls.js";
 import { EffectComposer } from 'https://cdn.skypack.dev/three@0.149.0/examples/jsm/postprocessing/EffectComposer';
 import { RenderPass } from 'https://cdn.skypack.dev/three@0.149.0/examples/jsm/postprocessing/RenderPass';
@@ -11,23 +10,10 @@ import { VignetteShader } from './shader/VignetteShader.js';
 
 import * as THREE from 'https://unpkg.com/three@0.149.0/build/three.module.js';
 
-var mazeWidth = 10;
-var mazeHeight = mazeWidth;
-var howMuch = 4;
+var  mazeHeight = 10,mazeWidth = mazeHeight, mazeDepth = mazeHeight;
 var notStarted = true;
 
-var fpsCapped = true;
-
 var paused = true;
-
-var secretEnabled = false;
-
-let timeout;
-let currentMessage = "";
-const popup = document.getElementById("popup");
-
-var messageQueue = [];
-var isShowingMessage = false;
 
 // show loading spinner element with id loading-spinner
 const loadingSpinner = document.getElementById('loading-spinner');
@@ -84,37 +70,14 @@ composer.addPass(vignettePass);
 let acceleration = 0.002;
 let tolerance = mazeWidth;
 
-var shadersToggled = true;
-
 // add gui controls. instead of controls say settings
 const gui = new GUI();
 const graphicSettings = gui.addFolder("Graphics Settings");
-const gameplaySettings = gui.addFolder("Gameplay Settings");
-const shaderSettings = gui.addFolder("Shader Settings");
-const staticSettings = shaderSettings.addFolder("Static Settings");
-const rgbSettings = shaderSettings.addFolder("RGB Shift Settings");
-const vignetteSettings = shaderSettings.addFolder("Vignette Settings");
 const guicontrols = {
     enabled: true,
     pixelratio: 50,
     movementspeed: 1,
     generationdistance: mazeWidth,
-    fpscapped: true
-};
-const staticControls = {
-    enabled: true,
-    amount: 0.04,
-    size: 4.0
-};
-const rgbControls = {
-    enabled: true,
-    amount: 0.001,
-    angle: 0.0
-};
-const vignetteControls = {
-    enabled: true,
-    offset: 0.81,
-    darkness: 1.0
 };
 
 // add control for rotationSpeed
@@ -122,112 +85,12 @@ graphicSettings.add(guicontrols, "pixelratio", 20, 100, 5).onChange((value) => {
     renderer.setPixelRatio(window.devicePixelRatio * (value / 100));
 }).name("Pixel Ratio (%)").listen();
 
-// add control for movementSpeed
-gameplaySettings.add(guicontrols, "movementspeed", 0.2, 3, 0.1).onChange((value) => {
-    acceleration = 0.002 * value;
-}).name("Movement Speed").listen();
-
 // add control for generationDistance
 graphicSettings.add(guicontrols, "generationdistance", 1, mazeWidth, 1).onChange((value) => {
     tolerance = value;
 }).name("Generation Distance").listen();
 
-// add control for fpsCapped
-graphicSettings.add(guicontrols, "fpscapped").onChange((value) => {
-    fpsCapped = value;
-}).name("Cap FPS").listen();
-
-staticSettings.add(staticControls, "enabled").onChange((value) => {
-    staticPass.enabled = value;
-    if (value) {
-        staticPass.renderToScreen = true;
-    } else {
-        staticPass.renderToScreen = false;
-    }
-}).name("Enabled").listen();
-
-staticSettings.add(staticControls, "amount", 0, 1, 0.01).onChange((value) => {
-    staticPass.uniforms.amount.value = value;
-}).name("Amount").listen();
-
-staticSettings.add(staticControls, "size", 0, 10, 0.1).onChange((value) => {
-    staticPass.uniforms.size.value = value;
-}).name("Size").listen();
-
-// add control for rgb shift
-rgbSettings.add(rgbControls, "enabled").onChange((value) => {
-    RGBShiftShaderPass.enabled = value;
-    if (value) {
-        RGBShiftShaderPass.renderToScreen = true;
-    } else {
-        RGBShiftShaderPass.renderToScreen = false;
-    }
-}).name("Enabled").listen();
-rgbSettings.add(rgbControls, "amount", 0, 1, 0.001).onChange((value) => {
-    RGBShiftShaderPass.uniforms.amount.value = value;
-}).name("Amount").listen();
-rgbSettings.add(rgbControls, "angle", 0, 1, 0.001).onChange((value) => {
-    RGBShiftShaderPass.uniforms.angle.value = value;
-}).name("Angle").listen();
-
-// add control for vignette
-vignetteSettings.add(vignetteControls, "enabled").onChange((value) => {
-    vignettePass.enabled = value;
-    if (value) {
-        vignettePass.renderToScreen = true;
-    } else {
-        vignettePass.renderToScreen = false;
-    }
-}).name("Enabled").listen();
-
-vignetteSettings.add(vignetteControls, "offset", 0, 1, 0.001).onChange((value) => {
-    vignettePass.uniforms.offset.value = value;
-}).name("Offset").listen();
-
-vignetteSettings.add(vignetteControls, "darkness", 0, 1, 0.001).onChange((value) => {
-    vignettePass.uniforms.darkness.value = value;
-}).name("Darkness").listen();
-
-// toggle all shaders
-shaderSettings.add({ toggleAll: function () {
-    toggleShaders();
-} }, "toggleAll").name("Toggle All Shaders");
-
-function toggleShaders(){
-    if (shadersToggled) {
-        staticPass.enabled = false;
-        RGBShiftShaderPass.enabled = false;
-        vignettePass.enabled = false;
-        shadersToggled = false;
-    } else {
-        staticPass.enabled = true;
-        RGBShiftShaderPass.enabled = true;
-        vignettePass.enabled = true;
-        shadersToggled = true;
-    }
-    if (staticPass.enabled) {
-        staticPass.renderToScreen = true;
-    } else {
-        staticPass.renderToScreen = false;
-    }
-    if (RGBShiftShaderPass.enabled) {
-        RGBShiftShaderPass.renderToScreen = true;
-    } else {
-        RGBShiftShaderPass.renderToScreen = false;
-    }
-    if (vignettePass.enabled) {
-        vignettePass.renderToScreen = true;
-    } else {
-        vignettePass.renderToScreen = false;
-    }
-    // also set all the settings
-    staticControls.enabled = staticPass.enabled;
-    rgbControls.enabled = RGBShiftShaderPass.enabled;
-    vignetteControls.enabled = vignettePass.enabled;
-}
-
-shaderSettings.close();
-gameplaySettings.close();
+graphicSettings.close();
 
 // create a light and add it to the scene up top and add a shadow to the renderer
 const light = new THREE.DirectionalLight(0xfeffd9, 0.9);
@@ -253,17 +116,6 @@ startButton.addEventListener(
         menuPanel.style.display = 'none'
         if (notStarted){
             startButton.innerHTML = "Click to Resume"
-            setTimeout(function () {
-                popupMessage("Press \"1\" to toggle all shader effects.")
-            }, 15000);
-            setTimeout(function () {
-
-                popupMessage("Press \"3\" to toggle FPS cap.")
-            }, 30000);
-            setTimeout(function () {
-
-                popupMessage("Enter the Konami Code for a super top secret suprise!")
-            }, 69000);
             acceleration = 0.002;
             keyState.KeyW = false;
             controls.getObject().position.x = 0;
@@ -293,39 +145,9 @@ controls.addEventListener('unlock', function () {
     });
 })
 
-var input = '';
-var key = '38384040373937396665'; // konami code, up up down down left right left right b a
-
 document.addEventListener(
     'keydown',
     function (e) {
-        if (!paused){
-            input += '' + e.keyCode;
-            if (input === key) {
-                input = '';
-                if (secretEnabled)
-                    return;
-                activateKonamiCode();
-            }
-        }
-        if (e.code == 'Digit1') {
-            toggleShaders();
-        }
-        if (e.code == 'Digit3') {
-            fpsCapped = !fpsCapped;
-            guicontrols.fpscapped = fpsCapped;
-        }
-        if (e.code == "Digit4") {
-            if (guicontrols.pixelratio == 100 || guicontrols.pixelratio != 55) {
-                guicontrols.pixelratio = 55;
-                renderer.setPixelRatio(window.devicePixelRatio * 0.55);
-            } else {
-                guicontrols.pixelratio = 100;
-                renderer.setPixelRatio(window.devicePixelRatio * 1);
-            }
-        }
-        if (!key.indexOf(input)) return;
-        input = '' + e.keyCode;
         if (e.code === 'Escape') {
             // show #startButton and #menuPanel
             startButton.style.display = 'block'
@@ -335,7 +157,6 @@ document.addEventListener(
     },
     false
 )
-
 
 // if lose focus of canvas, unlock pointer lock controls and show #startButton and #menuPanel. listen for blur
 window.addEventListener(
@@ -594,33 +415,27 @@ function generateMazeWalls(maze, offsetX, offsetZ) {
     }
 }
 
-const raycaster = new THREE.Raycaster();
-
 let shaderTime = 0;
 
 const halfMazeWidth = mazeWidth / 2;
 const halfMazeHeight = mazeHeight / 2;
 
 var lastTime = 0;
-var maxFPS = 100;
 
 let clock = new THREE.Clock();
 
 function update() {
     var currentTime = performance.now();
     var deltaTime = currentTime - lastTime;
-    // Limit frame rate to prevent physics bugs
-    if (deltaTime > 1000 / maxFPS || !fpsCapped) {
         stats.begin();
 
-        if (keyState.KeyW) velocity.z += acceleration;
-        if (keyState.KeyA) velocity.x -= acceleration;
-        if (keyState.KeyS) velocity.z -= acceleration;
-        if (keyState.KeyD) velocity.x += acceleration;
-        if (keyState.KeyQ) velocity.y += acceleration;
-        if (keyState.Space) velocity.y += acceleration;
-        if (keyState.KeyE) velocity.y -= acceleration;
-        if (keyState.ShiftLeft) velocity.z += acceleration * 1.5;
+        if (keyState.KeyW || keyState.ArrowUp) velocity.z += acceleration;
+        if (keyState.KeyA || keyState.ArrowLeft) velocity.x -= acceleration;
+        if (keyState.KeyS || keyState.ArrowDown) velocity.z -= acceleration;
+        if (keyState.KeyD || keyState.ArrowRight) velocity.x += acceleration;
+        if (keyState.KeyQ || keyState.PageUp) velocity.y += acceleration;
+        if (keyState.KeyE || keyState.PageDown) velocity.y -= acceleration;
+        if (keyState.ShiftLeft || keyState.ShiftRight) velocity.z += acceleration * 1.5;
 
         velocity.multiplyScalar(damping);
 
@@ -668,15 +483,10 @@ function update() {
 
         lastTime = currentTime;
         stats.end();
-    }
 
     const delta = clock.getDelta();
 
-    if ( mixer !== undefined ) {
-
-        mixer.update( delta );
-
-    }
+    if ( mixer !== undefined ) {mixer.update( delta );}
 
     requestAnimationFrame(update);
 }
@@ -834,61 +644,4 @@ acceleration = 0.001;
 
 update();
 
-function activateKonamiCode() {
-    popupMessage("Konami Code activated!")
-    
-}
-
-function popupMessage(message) {
-    if (!currentMessage)
-    {
-        currentMessage = "";
-    }
-    if (message === currentMessage || messageQueue.includes(message)) {
-        return;
-    }
-
-    messageQueue.push(message);
-
-    if (!isShowingMessage) {
-        showNextMessage();
-    }
-}
-
-function showNextMessage() {
-    if (messageQueue.length > 0) {
-        // hide the current message
-        popup.classList.remove("show");
-        popup.classList.add("hide");
-        // var nextMessage = messageQueue.shift();
-        // showMessage(nextMessage);
-        // wait a second for tran  sition
-        setTimeout(function () {
-            var nextMessage = messageQueue.shift();
-            showMessage(nextMessage);
-        }, 550);
-    }
-}
-
-function showMessage(message) {
-    isShowingMessage = true;
-    popup.innerHTML = message;
-    currentMessage = message;
-    popup.classList.add("show");
-    popup.classList.remove("hide"); // Remove the 'hide' class if it was added
-
-    if (timeout !== undefined) {
-        clearTimeout(timeout);
-    }
-
-    timeout = setTimeout(function () {
-        popup.classList.remove("show");
-        popup.classList.add("hide");
-        currentMessage = "";
-        isShowingMessage = false;
-        showNextMessage(); // Show the next message in the queue
-    }, 2500);
-}
-
 ceilingMaterial.color.setHex(0x777777);
-

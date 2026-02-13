@@ -4,5 +4,5 @@ Uses [Three.js](https://threejs.org/) and [Prim's Algorithm](https://en.wikipedi
 
 Incorporates GLSL post-processing.
 
-Access the latest deployment [here](https://jarvisar.github.io/threejs-maze/).
+Access the latest deployment [here](https://hacknorris-code.github.io/threejs-maze/).
 
