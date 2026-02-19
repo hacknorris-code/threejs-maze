@@ -13,6 +13,7 @@ import Stats from 'https://cdn.skypack.dev/stats.js';
 import { VignetteShader } from './shader/VignetteShader.js';
 
 import * as THREE from 'https://unpkg.com/three@0.149.0/build/three.module.js';
+import { GLTFLoader } from 'https://unpkg.com/three@0.149.0/examples/jsm/loaders/GLTFLoader.js';
 
 // ============== CONFIG ==============
 const MAZE_SIZE = 10;           // width = height
@@ -355,6 +356,37 @@ function checkCollision(oldPos) {
     }
 }
 
+// ================ CAT =================
+
+const loader = new GLTFLoader();
+let pet; // The pet (cat) model
+
+loader.load('public/kotek.gltf', (gltf) => {
+    pet = gltf.scene; // The pet model is now a part of the scene
+
+    pet.scale.set(0.02, 0.02, 0.02);
+    pet.position.set(0, -0.5, 1); // Position relative to the player
+    pet.traverse(child => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+        }
+    });
+
+    scene.add(pet); // Add the pet to the scene
+});
+
+function updatePetPosition() {
+    if (pet) {
+        // Get the position of the player (camera or object)
+        const playerPosition = controls.getObject().position;
+
+        // Set the pet's position relative to the player: slightly behind and below
+        pet.position.set(playerPosition.x, playerPosition.y - 0.5, playerPosition.z - 0.5);
+
+    }
+}
+
 // ============== CHUNK GENERATION ==============
 function unloadChunk(key) {
     const group = chunkObjects.get(key);
@@ -467,7 +499,7 @@ function animate(now = 0) {
     if (keyState.KeyA || keyState.ArrowLeft)  velocity.x -= acceleration;
     if (keyState.KeyD || keyState.ArrowRight) velocity.x += acceleration;
     if (keyState.ShiftLeft || keyState.ShiftRight) velocity.z -= acceleration * 1.5;
-
+    updatePetPosition();
     coordinates.innerHTML = `(${controls.getObject().position.x.toFixed(2)};${controls.getObject().position.z.toFixed(2)};0.5;${currentW})`;
 
     velocity.multiplyScalar(damping);
