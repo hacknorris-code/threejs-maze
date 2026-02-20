@@ -151,6 +151,7 @@ const startBtn = document.getElementById('startButton');
 const menu = document.getElementById('menuPanel');
 
 startBtn.addEventListener('click', () => {
+    startTime();
     controls.lock();
 });
 
@@ -200,6 +201,18 @@ function findSafeSpawn(maze) {
     }
     // Final fallback if the maze is somehow 100% solid
     return { x: 0.5, z: 0.5, w: 0 };
+}
+
+let timeRate = 0;
+
+function startTime() {
+    const today = new Date();
+    let h = today.getHours();
+    let m = today.getMinutes();
+    let s = today.getSeconds();
+    timer.innerHTML =  String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0') + " }";
+    timeRate += 0.1;
+    setTimeout(startTime, 1000*(currentW*timeRate/10));
 }
 
 function generateMaze() {
@@ -382,7 +395,7 @@ function updatePetPosition() {
         const playerPosition = controls.getObject().position;
 
         // Set the pet's position relative to the player: slightly behind and below
-        pet.position.set(playerPosition.x, playerPosition.y - 0.5, playerPosition.z - 0.5);
+        pet.position.lerp(new THREE.Vector3(playerPosition.x, playerPosition.y - 0.5, playerPosition.z - 0.5),0.1);
 
     }
 }
@@ -500,7 +513,7 @@ function animate(now = 0) {
     if (keyState.KeyD || keyState.ArrowRight) velocity.x += acceleration;
     if (keyState.ShiftLeft || keyState.ShiftRight) velocity.z -= acceleration * 1.5;
     updatePetPosition();
-    coordinates.innerHTML = `(${controls.getObject().position.x.toFixed(2)};${controls.getObject().position.z.toFixed(2)};0.5;${currentW})`;
+    coordinates.innerHTML = `( ${controls.getObject().position.x.toFixed(2)} ; ${controls.getObject().position.z.toFixed(2)} ; 0.5 ; ${currentW} ; `;
 
     velocity.multiplyScalar(damping);
 
