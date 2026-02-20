@@ -207,12 +207,13 @@ let timeRate = 0;
 
 function startTime() {
     const today = new Date();
+    today.setSeconds(today.getSeconds()+((currentW+1)*timeRate/10));
     let h = today.getHours();
     let m = today.getMinutes();
     let s = today.getSeconds();
-    timer.innerHTML =  String(h).padStart(2, '0') + ":" + String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0') + " }";
+    timer.innerHTML =  String(Math.round(h)).padStart(2, '0') + ":" + String(Math.round(m)).padStart(2, '0') + ":" + String(Math.round(s)).padStart(2, '0') + " }";
     timeRate += 0.1;
-    setTimeout(startTime, 1000*(currentW*timeRate/10));
+    setTimeout(startTime, 1000);
 }
 
 function generateMaze() {
