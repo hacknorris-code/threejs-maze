@@ -21,7 +21,7 @@ const MAZE_DEPTH = 7;           // W layers (0-6)
 let currentW = 0;
 
 let tolerance = MAZE_SIZE;      // generation distance
-let acceleration = 0.002;
+let acceleration = 0.07;
 const damping = 0.9;
 
 var stats = new Stats();
@@ -350,23 +350,33 @@ function refreshAllVisuals() {
 // ============== COLLISION ==============
 function checkCollision(oldPos) {
     const pos = controls.getObject().position;
-    const cx = Math.floor((pos.x + MAZE_SIZE/2) / MAZE_SIZE);
-    const cz = Math.floor((pos.z + MAZE_SIZE/2) / MAZE_SIZE);
-    const key = `${cx},${cz}`;
-    const maze = worldData.get(key);
-    if (!maze) return;
+    const radius = 0.2;
 
-    const localX = pos.x - cx * MAZE_SIZE;
-    const localZ = pos.z - cz * MAZE_SIZE;
+    // Define the 4 corners to check
+    const checks = [
+        { x: pos.x + radius, z: pos.z + radius },
+        { x: pos.x - radius, z: pos.z + radius },
+        { x: pos.x + radius, z: pos.z - radius },
+        { x: pos.x - radius, z: pos.z - radius }
+    ];
 
-    const gridX = Math.floor(localX + MAZE_SIZE / 2);
-    const gridY = Math.floor(localZ + MAZE_SIZE / 2);
+    for (let point of checks) {
+        const cx = Math.floor((point.x + MAZE_SIZE/2) / MAZE_SIZE);
+        const cz = Math.floor((point.z + MAZE_SIZE/2) / MAZE_SIZE);
+        const key = `${cx},${cz}`;
+        const maze = worldData.get(key);
 
-    if (gridX < 0 || gridX >= MAZE_SIZE || gridY < 0 || gridY >= MAZE_SIZE) return;
+        if (maze) {
+            const localX = Math.floor((point.x - cx * MAZE_SIZE) + MAZE_SIZE / 2);
+            const localZ = Math.floor((point.z - cz * MAZE_SIZE) + MAZE_SIZE / 2);
 
-    if (maze[currentW][gridY][gridX] === 1) {
-        controls.getObject().position.copy(oldPos);
-        velocity.set(0, 0, 0);
+            // If any corner is inside a wall (1), reset position
+            if (maze[currentW] && maze[currentW][localZ] && maze[currentW][localZ][localX] === 1) {
+                controls.getObject().position.copy(oldPos);
+                velocity.set(0, 0, 0);
+                return; // Stop checking once we hit something
+            }
+        }
     }
 }
 
@@ -508,14 +518,14 @@ function animate(now = 0) {
     }
 
     // movement
-    if (keyState.KeyW || keyState.ArrowUp)    velocity.z += acceleration;
-    if (keyState.KeyS || keyState.ArrowDown)  velocity.z -= acceleration;
-    if (keyState.KeyA || keyState.ArrowLeft)  velocity.x -= acceleration;
-    if (keyState.KeyD || keyState.ArrowRight) velocity.x += acceleration;
+    if (keyState.KeyW || keyState.ArrowUp)    velocity.z += acceleration*dt;
+    if (keyState.KeyS || keyState.ArrowDown)  velocity.z -= acceleration*dt;
+    if (keyState.KeyA || keyState.ArrowLeft)  velocity.x -= acceleration*dt;
+    if (keyState.KeyD || keyState.ArrowRight) velocity.x += acceleration*dt;
     updatePetPosition();
     coordinates.innerHTML = `( ${controls.getObject().position.x.toFixed(2)} ; ${controls.getObject().position.z.toFixed(2)} ; 0.5 ; ${currentW} ; `;
 
-    velocity.multiplyScalar(damping);
+    velocity.multiplyScalar(Math.pow(damping, dt * 60));
 
     const oldPos = controls.getObject().position.clone();
     controls.moveForward(velocity.z);
@@ -525,7 +535,7 @@ function animate(now = 0) {
     updateChunks();
 
     // static noise
-    staticPass.uniforms.time.value = now * 0.001;
+    staticPass.uniforms.time.value = (now * 0.001)%1000;
 
     composer.render();
     stats.end();
