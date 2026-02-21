@@ -17,22 +17,79 @@ import { GLTFLoader } from 'https://unpkg.com/three@0.149.0/examples/jsm/loaders
 
 // ============== CONFIG ==============
 const MAZE_SIZE = 10;           // width = height
-const MAZE_DEPTH = 7;           // W layers (0-6)
+const MAZE_DEPTH = 8;           // W layers (0-6)
 let currentW = 0;
 
 let tolerance = MAZE_SIZE;      // generation distance
-let acceleration = 0.07;
+let acceleration = 0.1;
 const damping = 0.9;
 
 var stats = new Stats();
 
 let wpps = [
-    "./public/wallpaper.png", // initial crap, will replace
-    "./public/wallpaper3.png", // yellow backroom
-    "./public/wallpaper4.png" // grey construction metal with alpha
+    "./public/wallpaper0.png", // yellow backroom
+"./public/wallpaper1.png", // grey backroom
+"./public/wallpaper2.png", // concrete with pipes
+"./public/wallpaper3.png", // concrete
+"./public/wallpaper4.png", // brick
+"./public/wallpaper5.png", // construction metal with alpha
+"./public/wallpaper6.png",  // geoskeleton
+"./public/wallpaper7.png"
 ];
 
-let current_wpp = wpps[1];
+const layerConfigs = {
+    0: {
+        wpp: wpps[0],
+        fog: 0xd9a336,
+        light: 0xfeffd9,
+        transparent: false
+    },
+    1: {
+        wpp: wpps[1],
+        fog: 0xe8e4ca,
+        light: 0xeeeeee,
+        transparent: false
+    },
+    2: {
+        wpp: wpps[2],
+        fog: 0x777777,
+        light: 0x777777,
+        transparent: true
+    },
+    3: {
+        wpp: wpps[3],
+        fog: 0x777777,
+        light: 0x777777,
+        transparent: true
+    },
+    4: {
+        wpp: wpps[4],
+        fog: 0x881100,
+        light: 0x881100,
+        transparent: true
+    },
+    5: {
+        wpp: wpps[5],
+        fog: 0x000,
+        light: 0x000000,
+        transparent: true
+    },
+    6: {
+        wpp: wpps[6],
+        fog: 0x000,
+        light: 0x000000,
+        transparent: true
+    },
+    7: {
+        wpp: wpps[7],
+        fog: 0x000,
+        light: 0x000000,
+        transparent: true
+    }
+    // Add configs for up to MAZE_DEPTH (6)
+};
+
+let current_wpp = wpps[0];
 
 stats.showPanel(0);
 document.body.appendChild( stats.dom );
@@ -108,7 +165,12 @@ const ceilBump = loadTexture('./public/ceiling_tile_heightmap.png', { repeatX: 6
 
 // ============== GEOMETRIES ==============
 const wallGeo = new THREE.BoxGeometry(1.0001, 1, 1.0001);
-const wallMat = new THREE.MeshPhongMaterial({ map: wallTex });
+const wallMat = new THREE.MeshPhongMaterial({
+    map: wallTex ,
+    transparent: true, // Allows transparency
+    alphaTest: 0.5,    // Prevents "invisible" walls from blocking the view of things behind them
+    side: THREE.DoubleSide
+});
 
 const floorGeo = new THREE.PlaneGeometry(MAZE_SIZE, MAZE_SIZE);
 const floorMat = new THREE.MeshPhongMaterial({
@@ -335,15 +397,32 @@ function createCeiling(cx, cz, parent) {
     parent.add(c);
 }
 function refreshAllVisuals() {
-    // 1. Clear all existing chunk groups from the scene
+    const config = layerConfigs[currentW] || layerConfigs[0];
+
+    // 1. Update the Wall Texture
+    // We load the new texture and swap it on the existing material
+    textureLoader.load(config.wpp, (tex) => {
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(9, 3); // Keep your repeat settings
+        wallMat.map = tex;
+        wallMat.transparent = config.transparent;
+        wallMat.needsUpdate = true;
+    });
+
+    // 2. Update Scene Colors
+    const newColor = new THREE.Color(config.fog);
+    scene.fog.color = newColor;
+    renderer.setClearColor(newColor);
+    dirLight.color = new THREE.Color(config.light);
+
+    // 3. Clear all existing chunk groups from the scene
     for (const key of chunkObjects.keys()) {
         const group = chunkObjects.get(key);
         scene.remove(group);
-        // Optional: dispose here if you want to be super clean
     }
     chunkObjects.clear();
 
-    // 2. Just let updateChunks rebuild them for the new currentW
+    // 4. Just let updateChunks rebuild them for the new currentW
     updateChunks();
 }
 
@@ -507,7 +586,6 @@ function animate(now = 0) {
     // W-dimension switch (Q/E or PageUp/Down)
     if ((keyState.KeyQ || keyState.PageUp) && Date.now() > wCooldown) {
         currentW = (currentW + 1) % MAZE_DEPTH;
-        if(6 == currentW) current_wpp = wpps[0];
         refreshAllVisuals();
         wCooldown = Date.now() + 250;
     }
