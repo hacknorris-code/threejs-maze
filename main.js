@@ -396,7 +396,7 @@ function updatePetPosition() {
         const playerPosition = controls.getObject().position;
 
         // Set the pet's position relative to the player: slightly behind and below
-        pet.position.lerp(new THREE.Vector3(playerPosition.x, playerPosition.y - 0.5, playerPosition.z - 0.5),0.1);
+        pet.position.lerp(new THREE.Vector3(playerPosition.x-0.5, playerPosition.y - 0.5, playerPosition.z - 0.5),0.1);
 
     }
 }
@@ -512,7 +512,6 @@ function animate(now = 0) {
     if (keyState.KeyS || keyState.ArrowDown)  velocity.z -= acceleration;
     if (keyState.KeyA || keyState.ArrowLeft)  velocity.x -= acceleration;
     if (keyState.KeyD || keyState.ArrowRight) velocity.x += acceleration;
-    if (keyState.ShiftLeft || keyState.ShiftRight) velocity.z -= acceleration * 1.5;
     updatePetPosition();
     coordinates.innerHTML = `( ${controls.getObject().position.x.toFixed(2)} ; ${controls.getObject().position.z.toFixed(2)} ; 0.5 ; ${currentW} ; `;
 
