@@ -21,20 +21,31 @@ const MAZE_DEPTH = 8;           // W layers (0-6)
 let currentW = 0;
 
 let tolerance = MAZE_SIZE;      // generation distance
-let acceleration = 0.1;
+let acceleration = 0.15;
 const damping = 0.9;
 
 var stats = new Stats();
 
 let wpps = [
     "./public/wallpaper0.png", // yellow backroom
-"./public/wallpaper1.png", // grey backroom
-"./public/wallpaper2.png", // concrete with pipes
-"./public/wallpaper3.png", // concrete
-"./public/wallpaper4.png", // brick
-"./public/wallpaper5.png", // construction metal with alpha
-"./public/wallpaper6.png",  // geoskeleton
-"./public/wallpaper7.png"
+    "./public/wallpaper1.png", // grey backroom
+    "./public/wallpaper2.png", // concrete with pipes
+    "./public/wallpaper3.png", // concrete
+    "./public/wallpaper4.png", // brick
+    "./public/wallpaper5.png", // construction metal with alpha
+    "./public/wallpaper6.png", // geoskeleton
+    "./public/wallpaper7.png"  // literal nothing / placeholder image
+];
+
+let texts = [
+  "exit to the left.\n NOT THIS LEFT ",
+  "what? where i am?",
+  "feed the cat \n        - dad",
+  "-bread\n-milk\n-cheese\n-... have i forgot something?",
+  "come back yesterday for a bonus",
+  "console.log('bug is here!');",
+  "...",
+  "(empty)"
 ];
 
 const layerConfigs = {
@@ -64,29 +75,28 @@ const layerConfigs = {
     },
     4: {
         wpp: wpps[4],
-        fog: 0x881100,
-        light: 0x881100,
+        fog: 0x662211,
+        light: 0x662211,
         transparent: true
     },
     5: {
         wpp: wpps[5],
-        fog: 0x000,
+        fog: 0x000000,
         light: 0x000000,
         transparent: true
     },
     6: {
         wpp: wpps[6],
-        fog: 0x000,
+        fog: 0x000000,
         light: 0x000000,
         transparent: true
     },
     7: {
         wpp: wpps[7],
-        fog: 0x000,
+        fog: 0x000000,
         light: 0x000000,
         transparent: true
     }
-    // Add configs for up to MAZE_DEPTH (6)
 };
 
 let current_wpp = wpps[0];
@@ -147,7 +157,7 @@ function loadTexture(path, options = {}) {
 }
 
 // ============== TEXTURES ==============
-const wallTex = loadTexture(current_wpp/*'./public/wallpaper3.png'*/, { repeatX: 18, repeatY: 6, offset: {x: Math.random(), y: Math.random()} }); //textureLoader.load('./public/wallpaper.png');
+const wallTex = loadTexture(current_wpp, { repeatX: 9, repeatY: 3, offset: {x: Math.random(), y: Math.random()} }); //textureLoader.load('./public/wallpaper.png');
 //wallTex.wrapS = wallTex.wrapT = THREE.RepeatWrapping;
 
 const floorTex = loadTexture('./public/floor.png', { repeatX: 60, repeatY: 60 }); //textureLoader.load('./public/floor.png');
@@ -211,6 +221,10 @@ scene.add(controls.getObject());
 
 const startBtn = document.getElementById('startButton');
 const menu = document.getElementById('menuPanel');
+
+// function togAu()[
+//
+// ]
 
 startBtn.addEventListener('click', () => {
     startTime();
@@ -464,7 +478,7 @@ function checkCollision(oldPos) {
 const loader = new GLTFLoader();
 let pet; // The pet (cat) model
 
-loader.load('public/kotek.gltf', (gltf) => {
+loader.load('public/kotek_redo.gltf', (gltf) => {
     pet = gltf.scene; // The pet model is now a part of the scene
 
     pet.scale.set(0.02, 0.02, 0.02);
@@ -570,6 +584,33 @@ document.addEventListener('keyup',   e => { if (!paused) keyState[e.code] = fals
 
 let wCooldown = 0;
 
+// Select all radio buttons in the group
+const radios = document.querySelectorAll('input[name="item_bar"]');
+
+let currentIndex = 0; // Start from the first radio button
+
+// Function to update the selected radio button
+function updateRadioSelection() {
+    radios.forEach((radio, index) => {
+        radio.checked = index === currentIndex;
+    });
+}
+
+// Listen for the mousewheel event on the document
+document.addEventListener('wheel', (e) => {
+    if (e.deltaY > 0) {
+        // Scroll down, move to next radio button
+        currentIndex = (currentIndex + 1) % radios.length;
+    } else {
+        // Scroll up, move to previous radio button
+        currentIndex = (currentIndex - 1 + radios.length) % radios.length;
+    }
+    updateRadioSelection();
+});
+
+// Initialize the radio selection
+updateRadioSelection();
+
 // ============== MAIN LOOP ==============
 let lastTime = 0;
 function animate(now = 0) {
@@ -584,12 +625,12 @@ function animate(now = 0) {
     }
 
     // W-dimension switch (Q/E or PageUp/Down)
-    if ((keyState.KeyQ || keyState.PageUp) && Date.now() > wCooldown) {
+    if ((keyState.KeyE || keyState.PageDown) && Date.now() > wCooldown) {
         currentW = (currentW + 1) % MAZE_DEPTH;
         refreshAllVisuals();
         wCooldown = Date.now() + 250;
     }
-    if ((keyState.KeyE || keyState.PageDown) && Date.now() > wCooldown) {
+    if ((keyState.KeyQ || keyState.PageUp) && Date.now() > wCooldown) {
         currentW = (currentW - 1 + MAZE_DEPTH) % MAZE_DEPTH;
         refreshAllVisuals();
         wCooldown = Date.now() + 250;
